@@ -1,0 +1,73 @@
+project:
+  name: fertility-outcome-classifier
+  version: "1.0.0"
+  description: "Clinical ML — predicts pregnancy success from couples' health, lifestyle, and treatment features"
+
+paths:
+  raw_data: data/raw/Fertility_Health_Dataset_2026.csv
+  processed_data: data/processed/features.parquet
+  model_dir: artifacts/models/
+  metrics_dir: artifacts/metrics/
+  plots_dir: artifacts/plots/
+  logs_dir: logs/
+
+data:
+  target: Pregnancy_Outcome
+  positive_class: Success
+  drop_columns:
+    - Couple_ID        # ID column — no signal
+  # Informative NaN strategy:
+  # Treatment_Type NaN = no treatment received
+  # Alcohol_Intake NaN = no alcohol consumption reported
+  informative_nan_fills:
+    Treatment_Type: "None"
+    Alcohol_Intake: "None"
+  categorical_features:
+    - Menstrual_Regularity
+    - PCOS
+    - Stress_Level
+    - Smoking
+    - Alcohol_Intake
+    - Treatment_Type
+  numeric_features:
+    - Female_Age
+    - Male_Age
+    - BMI
+    - Sperm_Count_Million_per_ml
+    - Motility_%
+    - Trying_Duration_Months
+    - Female_Age_x_Motility  # engineered: age-adjusted reproductive potential
+  binary_features: []
+  test_size: 0.2
+  random_state: 42
+  stratify: true
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 300
+    max_depth: 5
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    scale_pos_weight: 0.37   # 218 failure / 582 success = 0.37 (minority=Failure)
+    eval_metric: auc
+    random_state: 42
+  cv_folds: 5
+  scoring: roc_auc
+
+training:
+  save_model: true
+  model_filename: fertility_classifier_v1.pkl
+
+serving:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 2
+  decision_threshold: 0.40   # tuned for Failure recall — missing at-risk couples is costlier
+
+azure:
+  resource_group: rg-fertility-ml
+  container_registry: fertilitymlacr
+  app_name: fertility-outcome-api
+  location: eastus

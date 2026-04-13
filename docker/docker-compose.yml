@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+
+  fertility-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: fertility-outcome-api:latest
+    container_name: fertility-outcome-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../logs:/app/logs
+      - ../artifacts:/app/artifacts
+    environment:
+      - ENV=production
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  fertility-ui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.streamlit
+    image: fertility-outcome-ui:latest
+    container_name: fertility-outcome-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://fertility-api:8000
+    depends_on:
+      fertility-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
